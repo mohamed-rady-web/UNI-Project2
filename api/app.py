@@ -1,15 +1,17 @@
-# app.py
-# Flask server - handles API requests from the frontend
-# Two endpoints: /move (human move) and /reset (new game)
-
 import os
 from flask import Flask, request, jsonify, render_template
 from .game import Board, HUMAN, AI, EMPTY
 from .ai import get_ai_move
 
-# Template folder is one level up from api/ (at project root)
-template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
-app = Flask(__name__, template_folder=template_dir)
+# 1. Get the exact directory of this file (the api/ folder)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 2. Look for templates and static folders directly inside the api/ folder
+template_dir = os.path.join(current_dir, 'templates')
+static_dir = os.path.join(current_dir, 'static')
+
+# 3. Initialize Flask with these absolute paths
+app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 
 
 @app.route("/")
