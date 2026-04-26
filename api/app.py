@@ -4,11 +4,14 @@
 
 import os
 from flask import Flask, request, jsonify, render_template
-from game import Board, HUMAN, AI, EMPTY
-from ai import get_ai_move
+
+# Fixed imports for Vercel
+from api.game import Board, HUMAN, AI, EMPTY
+from api.ai import get_ai_move
 
 # Template folder is one level up from api/ (at project root)
-template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
+template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
+
 app = Flask(__name__, template_folder=template_dir)
 
 
@@ -19,8 +22,8 @@ def index():
 
 @app.route("/reset", methods=["POST"])
 def reset():
-    # return a fresh empty board
     board = Board()
+
     return jsonify({
         "grid": board.grid,
         "status": "playing",
@@ -31,19 +34,22 @@ def reset():
 @app.route("/move", methods=["POST"])
 def move():
     data = request.get_json()
+
     grid = data["grid"]
     col = data["col"]
 
     board = Board.from_grid(grid)
 
-    # validate the move
+    # validate move
     if not board.is_valid_move(col):
-        return jsonify({"error": "Invalid move"}), 400
+        return jsonify({
+            "error": "Invalid move"
+        }), 400
 
-    # human drops piece
+    # human move
     board.drop_piece(col, HUMAN)
 
-    # check if human won
+    # check if human wins
     if board.check_win(HUMAN):
         return jsonify({
             "grid": board.grid,
@@ -51,7 +57,7 @@ def move():
             "message": "You win! 🎉"
         })
 
-    # check draw after human move
+    # draw after human move
     if board.is_full():
         return jsonify({
             "grid": board.grid,
@@ -59,11 +65,11 @@ def move():
             "message": "It's a draw!"
         })
 
-    # AI takes its turn
+    # AI move
     ai_col = get_ai_move(board)
     board.drop_piece(ai_col, AI)
 
-    # check if AI won
+    # check if AI wins
     if board.check_win(AI):
         return jsonify({
             "grid": board.grid,
@@ -72,7 +78,7 @@ def move():
             "message": "Computer wins! Better luck next time."
         })
 
-    # check draw after AI move
+    # draw after AI move
     if board.is_full():
         return jsonify({
             "grid": board.grid,
