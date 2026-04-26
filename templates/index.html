@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Connect 4 – AI Project</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet"/>
+
+  <style>
+    :root {
+      --board-blue:   #1a3a5c;
+      --board-dark:   #0f2236;
+      --human-color:  #ff4d4d;
+      --ai-color:     #f5c542;
+      --empty-color:  #0a1929;
+      --bg:           #07111d;
+      --text:         #e8f0fe;
+      --muted:        #8899aa;
+      --accent:       #2979ff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(1.8rem, 5vw, 2.6rem);
+      font-weight: 800;
+      letter-spacing: -1px;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+    }
+
+    /* ── Status bar ── */
+    #status-bar {
+      background: #112033;
+      border: 1px solid #1e3a5c;
+      border-radius: 10px;
+      padding: 10px 24px;
+      font-size: 1rem;
+      font-weight: 500;
+      margin-bottom: 20px;
+      min-width: 260px;
+      text-align: center;
+      transition: background 0.3s;
+    }
+    #status-bar.win   { background: #0d3320; border-color: #2ecc71; color: #2ecc71; }
+    #status-bar.lose  { background: #330d0d; border-color: #e74c3c; color: #e74c3c; }
+    #status-bar.draw  { background: #1a1a2e; border-color: #888;    color: #aaa;    }
+
+    /* ── Score row ── */
+    .score-row {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .score-box {
+      background: #112033;
+      border: 1px solid #1e3a5c;
+      border-radius: 10px;
+      padding: 8px 20px;
+      text-align: center;
+      min-width: 90px;
+    }
+    .score-box .label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .score-box .val   { font-family: 'Syne', sans-serif; font-size: 1.5rem; font-weight: 800; }
+    .score-box.human .val { color: var(--human-color); }
+    .score-box.ai    .val { color: var(--ai-color); }
+    .score-box.draws .val { color: var(--muted); }
+
+    /* ── Board wrapper ── */
+    .board-wrapper {
+      background: var(--board-blue);
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    /* ── Column hover arrows ── */
+    .arrow-row {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      margin-bottom: 8px;
+      padding: 0 2px;
+    }
+    .arrow-btn {
+      background: none;
+      border: none;
+      color: transparent;
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: color 0.15s, transform 0.15s;
+      padding: 2px 0;
+      line-height: 1;
+    }
+    .arrow-btn:hover { color: var(--human-color); transform: translateY(-2px); }
+    body.ai-thinking .arrow-btn { pointer-events: none; opacity: 0.3; }
+    body.game-over   .arrow-btn { pointer-events: none; opacity: 0.2; }
+
+    /* ── The grid ── */
+    #board {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+    }
+
+    .cell {
+      width:  clamp(42px, 8vw, 62px);
+      height: clamp(42px, 8vw, 62px);
+      border-radius: 50%;
+      background: var(--empty-color);
+      box-shadow: inset 0 4px 8px rgba(0,0,0,0.5);
+      transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    /* highlight empty cells in a column when hovering that column */
+    .cell.col-hover:not(.human):not(.ai) {
+      background: #162d44;
+      box-shadow: inset 0 4px 8px rgba(0,0,0,0.5), 0 0 0 2px rgba(255,77,77,0.25);
+    }
+
+    /* drop animation */
+    @keyframes dropIn {
+      from { transform: translateY(-300%) scale(0.8); opacity: 0.5; }
+      to   { transform: translateY(0)    scale(1);   opacity: 1;   }
+    }
+    .cell.just-dropped { animation: dropIn 0.25s cubic-bezier(.22,.61,.36,1) forwards; }
+
+    .cell.human {
+      background: var(--human-color);
+      box-shadow: 0 0 12px rgba(255,77,77,0.45), inset 0 2px 4px rgba(255,255,255,0.2);
+    }
+    .cell.ai {
+      background: var(--ai-color);
+      box-shadow: 0 0 12px rgba(245,197,66,0.45), inset 0 2px 4px rgba(255,255,255,0.2);
+    }
+
+    /* win highlight */
+    @keyframes pulse {
+      0%,100% { transform: scale(1);    box-shadow: 0 0 12px currentColor; }
+      50%      { transform: scale(1.08); box-shadow: 0 0 28px currentColor; }
+    }
+    .cell.winner { animation: pulse 0.7s ease-in-out infinite; }
+    .cell.human.winner { color: var(--human-color); }
+    .cell.ai.winner    { color: var(--ai-color); }
+
+    /* AI thinking spinner inside the cell that was just played */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #thinking-spinner {
+      display: none;
+      width: 22px; height: 22px;
+      border: 3px solid rgba(255,255,255,0.15);
+      border-top-color: var(--ai-color);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      position: absolute;
+      top: 50%; left: 50%;
+      margin: -11px 0 0 -11px;
+    }
+    body.ai-thinking #thinking-spinner { display: block; }
+
+    /* ── Bottom buttons ── */
+    .btn-row {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+    .btn-reset {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.9rem;
+      letter-spacing: 0.5px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 28px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn-reset:hover  { background: #1565c0; }
+    .btn-reset:active { transform: scale(0.96); }
+
+    /* ── Legend ── */
+    .legend {
+      display: flex;
+      gap: 20px;
+      margin-top: 16px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      justify-content: center;
+    }
+    .legend span { display: flex; align-items: center; gap: 6px; }
+    .dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .dot.human { background: var(--human-color); }
+    .dot.ai    { background: var(--ai-color); }
+  </style>
+</head>
+<body>
+
+  <h1>Connect 4</h1>
+  <p class="subtitle">You vs. Minimax AI &nbsp;·&nbsp; AI Course Project</p>
+
+  <!-- Score board -->
+  <div class="score-row">
+    <div class="score-box human">
+      <div class="label">You</div>
+      <div class="val" id="score-human">0</div>
+    </div>
+    <div class="score-box draws">
+      <div class="label">Draws</div>
+      <div class="val" id="score-draws">0</div>
+    </div>
+    <div class="score-box ai">
+      <div class="label">AI</div>
+      <div class="val" id="score-ai">0</div>
+    </div>
+  </div>
+
+  <!-- Status message -->
+  <div id="status-bar">Your turn!</div>
+
+  <!-- Game board -->
+  <div class="board-wrapper">
+    <!-- drop arrows -->
+    <div class="arrow-row" id="arrow-row"></div>
+
+    <!-- cells -->
+    <div id="board"></div>
+
+    <!-- AI thinking spinner (shown in center while waiting) -->
+    <div style="position:relative; height:0;">
+      <div id="thinking-spinner"></div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-reset" onclick="resetGame()">New Game</button>
+  </div>
+
+  <div class="legend">
+    <span><span class="dot human"></span> You (X)</span>
+    <span><span class="dot ai"></span> Computer (O)</span>
+  </div>
+
+<script>
+  // ── State ──────────────────────────────────────────────
+  let grid = [];
+  let gameOver = false;
+
+  const scores = { human: 0, ai: 0, draws: 0 };
+
+  // ── DOM refs ───────────────────────────────────────────
+  const boardEl   = document.getElementById("board");
+  const arrowRow  = document.getElementById("arrow-row");
+  const statusBar = document.getElementById("status-bar");
+
+  // ── Init ───────────────────────────────────────────────
+  window.onload = () => resetGame();
+
+  // ── Reset / new game ───────────────────────────────────
+  async function resetGame() {
+    const res  = await fetch("/reset", { method: "POST" });
+    const data = await res.json();
+    grid     = data.grid;
+    gameOver = false;
+    document.body.classList.remove("game-over", "ai-thinking");
+    setStatus(data.message, "");
+    renderBoard();
+    renderArrows();
+  }
+
+  // ── Human clicks a column arrow ────────────────────────
+  async function dropHuman(col) {
+    if (gameOver) return;
+
+    // optimistic render
+    document.body.classList.add("ai-thinking");
+    setStatus("Computer is thinking…", "");
+
+    let res, data;
+    try {
+      res  = await fetch("/move", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ grid, col })
+      });
+      data = await res.json();
+    } catch (e) {
+      setStatus("Network error – is the server running?", "lose");
+      document.body.classList.remove("ai-thinking");
+      return;
+    }
+
+    document.body.classList.remove("ai-thinking");
+
+    if (data.error) { setStatus(data.error, "lose"); return; }
+
+    grid = data.grid;
+    renderBoard(data.ai_col);   // highlight the AI's drop too
+
+    handleStatus(data);
+  }
+
+  // ── Handle game status from server ─────────────────────
+  function handleStatus(data) {
+    if (data.status === "human_win") {
+      scores.human++;
+      updateScores();
+      setStatus(data.message, "win");
+      endGame();
+    } else if (data.status === "ai_win") {
+      scores.ai++;
+      updateScores();
+      setStatus(data.message, "lose");
+      endGame();
+    } else if (data.status === "draw") {
+      scores.draws++;
+      updateScores();
+      setStatus(data.message, "draw");
+      endGame();
+    } else {
+      setStatus(data.message, "");
+    }
+  }
+
+  function endGame() {
+    gameOver = true;
+    document.body.classList.add("game-over");
+  }
+
+  // ── Render the board ───────────────────────────────────
+  function renderBoard(aiCol = null) {
+    boardEl.innerHTML = "";
+
+    for (let r = 0; r < 6; r++) {
+      for (let c = 0; c < 7; c++) {
+        const cell = document.createElement("div");
+        cell.classList.add("cell");
+        cell.dataset.row = r;
+        cell.dataset.col = c;
+
+        const val = grid[r][c];
+        if (val === 1) cell.classList.add("human");
+        if (val === 2) cell.classList.add("ai");
+
+        // drop animation for the lowest newly placed piece in each column
+        if (aiCol !== null && c === aiCol && val === 2) {
+          const isBottom = r === bottomFilledRow(aiCol, 2);
+          if (isBottom) cell.classList.add("just-dropped");
+        }
+
+        // clicking any cell drops into that column
+        cell.addEventListener("click", () => dropHuman(c));
+
+        // hovering a cell highlights the whole column so it's obvious
+        cell.addEventListener("mouseenter", () => highlightCol(c, true));
+        cell.addEventListener("mouseleave", () => highlightCol(c, false));
+
+        boardEl.appendChild(cell);
+      }
+    }
+  }
+
+  function bottomFilledRow(col, player) {
+    for (let r = 5; r >= 0; r--) {
+      if (grid[r][col] === player) return r;
+    }
+    return -1;
+  }
+
+  // highlight / unhighlight all cells in a column on hover
+  function highlightCol(col, on) {
+    document.querySelectorAll(`.cell[data-col="${col}"]`).forEach(c => {
+      c.classList.toggle("col-hover", on);
+    });
+    // also light up the arrow
+    const arrows = document.querySelectorAll(".arrow-btn");
+    if (arrows[col]) arrows[col].style.color = on ? "var(--human-color)" : "";
+  }
+
+  // ── Render arrow buttons ───────────────────────────────
+  function renderArrows() {
+    arrowRow.innerHTML = "";
+    for (let c = 0; c < 7; c++) {
+      const btn = document.createElement("button");
+      btn.classList.add("arrow-btn");
+      btn.textContent = "▼";
+      btn.title = `Drop in column ${c + 1}`;
+      btn.onclick = () => dropHuman(c);
+      arrowRow.appendChild(btn);
+    }
+  }
+
+  // ── Status bar ─────────────────────────────────────────
+  function setStatus(msg, cls) {
+    statusBar.textContent = msg;
+    statusBar.className   = "";
+    if (cls) statusBar.classList.add(cls);
+  }
+
+  // ── Score display ──────────────────────────────────────
+  function updateScores() {
+    document.getElementById("score-human").textContent = scores.human;
+    document.getElementById("score-ai").textContent    = scores.ai;
+    document.getElementById("score-draws").textContent = scores.draws;
+  }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
