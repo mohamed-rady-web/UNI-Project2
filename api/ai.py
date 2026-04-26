@@ -2,7 +2,7 @@
 # Minimax with alpha-beta pruning - same algorithm, nothing changed
 
 import math
-from game import ROWS, COLS, EMPTY, HUMAN, AI
+from .game import ROWS, COLS, EMPTY, HUMAN, AI
 
 DEPTH = 5
 
