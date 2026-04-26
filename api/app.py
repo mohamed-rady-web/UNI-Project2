@@ -5,7 +5,7 @@
 import os
 from flask import Flask, request, jsonify, render_template
 from .game import Board, HUMAN, AI, EMPTY
-from ai import get_ai_move
+from .ai import get_ai_move
 
 # Template folder is one level up from api/ (at project root)
 template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
